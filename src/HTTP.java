@@ -1,6 +1,7 @@
 import java.util.List;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -14,6 +15,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HTTP {
 	public static HttpURLConnection con = null;
@@ -30,6 +33,93 @@ public class HTTP {
 		//			System.out.println();
 		//		}
 	}
+	public static String getSeriesNameFromPath(String path) {
+		//get the token needed to send requests
+		String token = getToken();
+
+		int selectedSeries = -1;
+		Scanner in = new Scanner(System.in);
+		System.out.println("If you have the id of the series, enter it here. If you don't have the id, enter the letter N to search for the series by name:");
+		String firstInput = "";
+		while(true) {
+			firstInput = in.nextLine();
+			if(!(firstInput.equalsIgnoreCase("n") || firstInput.equalsIgnoreCase("no"))) {
+				try {
+					int id = Integer.parseInt(firstInput);
+					return firstInput;
+				}
+				catch (NumberFormatException e) {
+					System.out.println("Invalid input. Try again...");
+				}
+			}
+			else {
+				break;
+			}
+		}
+
+		//search for the specified series
+		File tmp = new File(path);
+		System.out.println("Searching for series with name: \""+getBaseFileName(tmp.getName())+"\"...");
+		String searchResult = searchForSeries(getBaseFileName(tmp.getName()), token);
+
+		ArrayList<Series> listOfSeries = new ArrayList<Series>();
+		//Get the information about the search results
+		listOfSeries = getIDsFromSearchForSeries(searchResult);
+
+		//print a list of the series that were found and the index they correspond to
+		int amtShown = 0;
+		for(int i = 0; i<listOfSeries.size() && i < 10; i++) {
+			Series c = listOfSeries.get(i);
+			System.out.println("["+i+"] "+c.name + " - " + c.description);
+			amtShown++;
+		}
+
+		//prompt for the user to tell the program what series this is
+		System.out.println("\nEnter the number of the series associated with this directory. If none of these match, enter the letter M for more results.");
+		System.out.println("Input: ");
+
+		boolean validInput = false;
+		while(!validInput) {
+			String input = in.nextLine();
+			if(input.equalsIgnoreCase("m")) {
+				//print a list of the series that were found and the index they correspond to
+				for(int i = amtShown; i<listOfSeries.size() && i < amtShown+10; i++) {
+					Series c = listOfSeries.get(i);
+					System.out.println("["+i+"] "+c.name + " - " + c.description);
+					amtShown++;
+				}
+			}
+			else if(Integer.valueOf(input) >= 0 && Integer.valueOf(input) < listOfSeries.size()) {
+				selectedSeries = Integer.valueOf(input);
+				validInput = true;
+			}
+			else {
+				System.out.println("Please enter a valid input");
+			}
+		}
+
+		if(selectedSeries==-1) {
+			System.out.println(Main.ANSI_RED+"Unable to continue because none of the search results matched the desired series. EXITING"+Main.ANSI_RESET);
+			System.exit(0);
+		}
+		return listOfSeries.get(selectedSeries).id;
+	}
+	/**
+	 * Gets the base name, without extension, of given file name. Broken by hidden folders which start with a . and don't have a file extension
+	 * <p/>
+	 * e.g. getBaseName("file.txt") will return "file"
+	 *
+	 * @param fileName
+	 * @return the base name
+	 */
+	public static String getBaseFileName(String fileName) {
+		int index = fileName.lastIndexOf('.');
+		if (index == -1) {
+			return fileName;
+		} else {
+			return fileName.substring(0, index);
+		}
+	}
 	public static String predictSeriesName(String path) {
 		//get the token needed to send requests
 		String token = getToken();
@@ -41,17 +131,20 @@ public class HTTP {
 
 		Scanner in = new Scanner(System.in);
 		boolean predictedSeriesWasCorrect = false;
-		ArrayList<Series> listOfSeries = null;
+		ArrayList<Series> listOfSeries = new ArrayList<Series>();
 		int selectedSeries = -1;
 		if(possibleSearchTerms.length >= 2) {
 			String periodsRemoved = possibleSearchTerms[possibleSearchTerms.length - 2].replaceAll("\\.", " ");
 
 			String[] wordsInTitle = periodsRemoved.split(" ");
-			String term = "";
-			for(int i = 0; listOfSeries == null || listOfSeries.size() >=98; i++) {
-				if(i > wordsInTitle.length - 1)
-					break;
-				term = term+" "+wordsInTitle[i];
+
+			for(int i = wordsInTitle.length; listOfSeries.size() == 0 && i >= 0; i--) {
+				String term = "";
+				for(int j = 0; j < i; j++) {
+					if(term.length()>0)
+						term = term+" ";
+					term = term+wordsInTitle[j];
+				}
 				System.out.println("Attempting search term: "+term);
 				//search for the specified series
 				String searchResult = searchForSeries(term, token);
@@ -132,6 +225,24 @@ public class HTTP {
 		//HashMap<String, ArrayList<String>> res = getEpisodeNamesForSeries(seriesName, token);
 
 		ArrayList<String> seasons = new ArrayList<String>(episodesInSeries.keySet());
+		
+		
+		File folder = new File(path);
+		String seasonNameFromPath = folder.getName();
+		if(episodesInSeries.containsKey(seasonNameFromPath)) {
+			return episodesInSeries.get(seasonNameFromPath);
+		}
+		else if(episodesInSeries.containsKey(seasonNameFromPath.substring("Season ".length()))) {
+			return episodesInSeries.get(seasonNameFromPath.substring("Season ".length()));
+		}
+		else {
+			System.out.println("Season name from file path (\""+seasonNameFromPath+"\") did not match any seasons from the API. ");
+			System.out.println("The API has entries for the following seasons:");
+			for(String key: episodesInSeries.keySet()) {
+				System.out.println("\""+key+"\"");
+			}
+			System.out.println("Attempting to predict season...");
+		}
 
 		//try to predict the season
 		int[] matchesPerSeason = new int[seasons.size()];
@@ -166,31 +277,38 @@ public class HTTP {
 				greatestMatches = j;
 			}
 		}
-		int greatest;
+		int greatest = -999;
 		if(greatestSize >= 0 && largestMatchPerSeason[greatestSize].length() > 5) {
 			System.out.println("Using the season with the largest shared substring as the predicted substring.");
 			greatest = greatestSize;
 		}
-		else {
+		else if(greatestMatches >= 0){
 			System.out.println("Using the season with the largest number of shared substrings as the predicted season.");
 			greatest = greatestMatches;
 		}
-		System.out.println(Main.ANSI_GREEN+"Season being checked contains the following episodes: "+Main.ANSI_RESET);
-		for(int j = 0; j<videoFileNames.size(); j++) {
-			System.out.print(videoFileNames.get(j));
-			if(j < videoFileNames.size() - 1)
-				System.out.println(Main.ANSI_GREEN+","+Main.ANSI_RESET);
-		}
-		System.out.println("\n\n"+Main.ANSI_GREEN+"Predicted season is \""+seasons.get(greatest)+"\". It contains the following episodes: "+Main.ANSI_RESET);
-		for(int j = 0; j<episodesInSeries.get(seasons.get(greatest)).size(); j++) {
-			System.out.print(episodesInSeries.get(seasons.get(greatest)).get(j));
-			if(j < episodesInSeries.get(seasons.get(greatest)).size() - 1)
-				System.out.println(Main.ANSI_GREEN+","+Main.ANSI_RESET);
-		}
-		System.out.println("\n\nIs this correct? (y/n)");
-		String input = in.nextLine();
+		String input = null;
+		if(greatest>=0) {
+			System.out.println(Main.ANSI_GREEN+"Season being checked contains the following episodes: "+Main.ANSI_RESET);
+			for(int j = 0; j<videoFileNames.size(); j++) {
+				System.out.print(videoFileNames.get(j));
+				if(j < videoFileNames.size() - 1)
+					System.out.println(Main.ANSI_GREEN+","+Main.ANSI_RESET);
+			}
 
-		if(input.equalsIgnoreCase("y")||input.equalsIgnoreCase("yes")) {
+
+			System.out.println("\n\n"+Main.ANSI_GREEN+"Predicted season is \""+seasons.get(greatest)+"\". It contains the following episodes: "+Main.ANSI_RESET);
+			for(int j = 0; j<episodesInSeries.get(seasons.get(greatest)).size(); j++) {
+				System.out.print(episodesInSeries.get(seasons.get(greatest)).get(j));
+				if(j < episodesInSeries.get(seasons.get(greatest)).size() - 1)
+					System.out.println(Main.ANSI_GREEN+","+Main.ANSI_RESET);
+			}
+			System.out.println("\n\nIs this correct? (y/n)");
+			input = in.nextLine();
+		}
+		else {
+			System.out.println("\n"+Main.ANSI_RED+"Could not predict a season!"+Main.ANSI_RESET);
+		}
+		if(input!=null && (input.equalsIgnoreCase("y")||input.equalsIgnoreCase("yes"))) {
 			//in.close();
 			return episodesInSeries.get(seasons.get(greatest));
 		}
@@ -213,6 +331,19 @@ public class HTTP {
 			return episodesInSeries.get(seasons.get(Integer.valueOf(season)));
 		}
 	}
+	
+	private static String unescapeUnicode(String input) {
+        // pattern to find
+        Pattern p = Pattern.compile("\\\\u([0-9A-Fa-f]{4})");
+        Matcher m = p.matcher(input);
+        StringBuffer sb = new StringBuffer(input.length());
+        while (m.find()) {
+            int codePoint = Integer.parseInt(m.group(1), 16);
+            m.appendReplacement(sb, Matcher.quoteReplacement(Character.toString((char)codePoint)));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
 
 	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeries(String id, String token){
 		HashMap<String, ArrayList<String>> result = new HashMap<String, ArrayList<String>>();
@@ -240,23 +371,22 @@ public class HTTP {
 				String[] episodes = fullResponse.split("\\},\\{");
 				//System.out.println("\n---getepisodenamesforseries----=");
 				//String[] episodesInOrder = new String[episodes.length];
-				
+
 				//Structured as follows: HashMap<Season, HashMap<episode #, episode name>>
 				HashMap<String, TreeMap<Integer, String>> episodesInOrder = new HashMap<String, TreeMap<Integer, String>>();
-				
+
 				for(String s:episodes) {
 					//System.out.println(s);
-					String episodeNumber = s.split("airedEpisodeNumber\":")[1].split(",")[0];
-					String episodeSeason = s.split("airedSeason\":")[1].split(",")[0];
+					String episodeNumber = s.split("dvdEpisodeNumber\":")[1].split(",")[0];
+					String episodeSeason = s.split("dvdSeason\":")[1].split(",")[0];
 					String episodeName = s.split("episodeName\":\"")[1].split("\",\"firstAired")[0];
-
 					if(!result.containsKey(episodeSeason))
 						result.put(episodeSeason, new ArrayList<String>());
-					
+
 					if(!episodesInOrder.containsKey(episodeSeason))
 						episodesInOrder.put(episodeSeason, new TreeMap<Integer, String>());
 
-					episodesInOrder.get(episodeSeason).put(Integer.valueOf(episodeNumber), episodeName);
+					episodesInOrder.get(episodeSeason).put(Integer.valueOf(episodeNumber), unescapeUnicode(episodeName));
 				}
 
 				for(String season: episodesInOrder.keySet()) {
@@ -267,6 +397,7 @@ public class HTTP {
 				}
 				//System.out.println();
 				//System.out.println(fullResponse);
+				//HashMap<Character, Character> tmp = new HashMap<Character, Character>();
 
 			}
 			catch(Exception e) {
@@ -307,7 +438,9 @@ public class HTTP {
 		String result = "";
 		URL url = null;
 		try {
-			url = new URL("https://api.thetvdb.com/search/series?name="+title);
+
+			url = new URL("https://api.thetvdb.com/search/series?name="+title.replaceAll(" ", "%20"));
+			//System.out.println("\nSearch url: "+url.toString());
 			con = (HttpURLConnection)url.openConnection();
 			con.setRequestMethod("GET");
 			con.setRequestProperty("Content-Type", "application/json");
@@ -317,7 +450,8 @@ public class HTTP {
 			con.setConnectTimeout(5000);
 
 			result = getFullResponse(con);
-
+			//System.out.println("---------query result below-------");
+			//System.out.println(result);
 
 		}
 		catch(Exception e) {

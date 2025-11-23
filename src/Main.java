@@ -442,7 +442,7 @@ public class Main {
 		}
 
 		//determine the name of the series
-		String seriesName = HTTP.predictSeriesName(path+"/asdf");
+		String seriesName = HTTP.getSeriesNameFromPath(path+"/asdf");//predictSeriesName(path+"/asdf");
 
 		//get the token needed to send requests
 		String token = HTTP.getToken();
@@ -457,11 +457,12 @@ public class Main {
 		for(String season: videoFilesInPath.keySet()) {
 			System.out.println("\n" + ANSI_GREEN + "Processing " + season + ANSI_RESET);
 			Collections.sort(videoFilesInPath.get(season));
+			Collections.sort(subtitleFilesInPath.get(season));
 			ArrayList<String> videoNames = videoFilesInPath.get(season);
 			ArrayList<String> subtitleNames = subtitleFilesInPath.get(season);
 
 			//load the correct episode names into an arraylist
-			episodeNames.put(season, getEpisodeNamesFromSearch(HTTP.getEpisodeNamesForSeason(path, seriesName, videoNames, episodeNameResults)));
+			episodeNames.put(season, getEpisodeNamesFromSearch(HTTP.getEpisodeNamesForSeason(path+File.separator+season, seriesName, videoNames, episodeNameResults)));
 
 			//make sure there are the same number of video files in the season folder as there are in the search results for the season
 			if(videoNames.size()!=episodeNames.get(season).size()) {
@@ -507,9 +508,9 @@ public class Main {
 						System.out.println("Found "+patternsFound+" files that contained 2 episodes.");
 						System.out.println("The extra episode names were merged into a single string for each file.");
 						//make sure that the changes were enough to solve the issue
-						if(videoNames.size()!=episodeNames.size()) {
+						if(videoNames.size()!=episodeNames.get(season).size()) {
 							System.out.println("It appears that these changes did not resolve the issue.");
-							System.out.println("Number of video files in directory("+videoNames.size()+") does not equal expected episode count("+episodeNames.size()+")");
+							System.out.println("Number of video files in directory("+videoNames.size()+") does not equal expected episode count("+episodeNames.get(season).size()+")");
 							System.out.println("\nThe program cannot continue.");
 							System.out.println(ANSI_RED+"Exiting"+ANSI_RESET);
 							return;
@@ -689,7 +690,7 @@ public class Main {
 		Collections.sort(videoNames);
 
 		//determine the series name
-		String seriesName = HTTP.predictSeriesName(path);
+		String seriesName = HTTP.getSeriesNameFromPath(path);//predictSeriesName(path);
 
 		//get the token needed to send requests
 		String token = HTTP.getToken();
