@@ -86,7 +86,7 @@ public class Main {
 	 * @param searchResults - The original episode names obtained from theTVDB
 	 * @return - The episode names after they've been changed to conform to what format is expected for use on Jellyfin.
 	 */
-	public static ArrayList<String> getEpisodeNamesFromSearch(ArrayList<String> searchResults){
+	public static ArrayList<String> createEpisodeNamesFromSearch(ArrayList<String> searchResults){
 		/*
 		System.out.println("\n----search results----");
 		for(String s: searchResults) {
@@ -462,7 +462,9 @@ public class Main {
 			ArrayList<String> subtitleNames = subtitleFilesInPath.get(season);
 
 			//load the correct episode names into an arraylist
-			episodeNames.put(season, getEpisodeNamesFromSearch(HTTP.getEpisodeNamesForSeason(path+File.separator+season, seriesName, videoNames, episodeNameResults)));
+			ArrayList<String> episodeNamesForSeason = HTTP.getEpisodeNamesForSeason(path+File.separator+season, seriesName, videoNames, episodeNameResults);
+			
+			episodeNames.put(season, createEpisodeNamesFromSearch(episodeNamesForSeason));
 
 			//make sure there are the same number of video files in the season folder as there are in the search results for the season
 			if(videoNames.size()!=episodeNames.get(season).size()) {
@@ -655,7 +657,7 @@ public class Main {
 	 * 
 	 * @param path - A string representing the file path of a season which needs to have it's files reorganized and renamed.
 	 */
-	public static void renameFiles(String path) {
+	public static void renameFilesOld(String path) {
 		File folder;
 		File[] listOfFiles = null;
 		try {
@@ -698,7 +700,8 @@ public class Main {
 		//determine names of new files
 		HashMap<String, ArrayList<String>> episodeNameResults = HTTP.getEpisodeNamesForSeries(seriesName, token);
 		System.out.println("Performing search.");
-		ArrayList<String> episodeNames = getEpisodeNamesFromSearch(HTTP.getEpisodeNamesForSeason(path, seriesName, videoNames, episodeNameResults));//getEpisodeNamesFromClipboard();
+		ArrayList<String> episodeNames = createEpisodeNamesFromSearch(HTTP.getEpisodeNamesForSeason(path, seriesName, videoNames, episodeNameResults));//getEpisodeNamesFromClipboard();
+		
 
 		System.out.println("Finished search.");
 		//make sure there are the correct number of files in the directory

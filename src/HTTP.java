@@ -287,7 +287,7 @@ public class HTTP {
 			greatest = greatestMatches;
 		}
 		String input = null;
-		if(greatest>=0) {
+		if(greatest>=0) {//not executing this
 			System.out.println(Main.ANSI_GREEN+"Season being checked contains the following episodes: "+Main.ANSI_RESET);
 			for(int j = 0; j<videoFileNames.size(); j++) {
 				System.out.print(videoFileNames.get(j));
@@ -344,8 +344,81 @@ public class HTTP {
         m.appendTail(sb);
         return sb.toString();
     }
+	
+	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeries(String id, String token) {
+	    HashMap<String, ArrayList<String>> result = new HashMap<>();
+	    HashMap<String, TreeMap<Integer, String>> episodesInOrder = new HashMap<>();
 
-	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeries(String id, String token){
+	    int page = 1;
+
+	    while (true) {
+	        try {
+	            URL url = new URL("https://api.thetvdb.com/series/" + id + "/episodes?page=" + page);
+	            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+	            con.setRequestMethod("GET");
+	            con.setRequestProperty("Content-Type", "application/json");
+	            con.setRequestProperty("Authorization", "Bearer " + token);
+	            con.setDoOutput(true);
+	            con.setConnectTimeout(5000);
+
+	            String fullResponse = getFullResponse(con);
+
+	            if (fullResponse.contains("No results for your query:")) {
+	                break;
+	            }
+
+	            String[] episodes = fullResponse.split("\\},\\{");
+
+	            for (String s : episodes) {
+	                String dvdEpisodeNumberStr = s.split("dvdEpisodeNumber\":")[1].split(",")[0];
+	                String dvdEpisodeSeason = s.split("dvdSeason\":")[1].split(",")[0];
+	                String airedEpisodeNumberStr = s.split("airedEpisodeNumber\":")[1].split(",")[0];
+	                String airedEpisodeSeason = s.split("airedSeason\":")[1].split(",")[0];
+	                String episodeName = s.split("episodeName\":\"")[1].split("\",\"firstAired")[0];
+
+	                int episodeNumber = -1;
+	                if(dvdEpisodeNumberStr.equals("null")) {
+	                	episodeNumber = Integer.parseInt(airedEpisodeNumberStr);
+	                }
+	                else {
+	                	episodeNumber = Integer.parseInt(dvdEpisodeNumberStr);
+	                }
+	                String episodeSeason = dvdEpisodeSeason;
+	                if(episodeSeason.equals("null")) {
+	                	episodeSeason = airedEpisodeSeason;
+	                }
+
+	                if (!episodesInOrder.containsKey(episodeSeason)) {
+	                    episodesInOrder.put(episodeSeason, new TreeMap<Integer, String>());
+	                }
+
+	                episodesInOrder.get(episodeSeason).put(episodeNumber, unescapeUnicode(episodeName));
+	            }
+
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            return null;
+	        }
+
+	        page++;
+	    }
+
+	    // Build the final result *after* all pages are processed
+	    for (String season : episodesInOrder.keySet()) {
+	        ArrayList<String> episodeList = new ArrayList<>();
+
+	        for (Integer episodeNum : episodesInOrder.get(season).keySet()) {
+	            episodeList.add(episodesInOrder.get(season).get(episodeNum));
+	        }
+
+	        result.put(season, episodeList);
+	    }
+
+
+	    return result;
+	}
+
+	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeriesOld(String id, String token){
 		HashMap<String, ArrayList<String>> result = new HashMap<String, ArrayList<String>>();
 		int page = 1;
 		while(true) {
