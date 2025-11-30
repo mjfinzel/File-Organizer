@@ -345,7 +345,7 @@ public class HTTP {
         return sb.toString();
     }
 	
-	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeries(String id, String token) {
+	public static HashMap<String, ArrayList<String>> getEpisodeNamesForSeries(String id, String token, boolean useDVDOrder) {
 	    HashMap<String, ArrayList<String>> result = new HashMap<>();
 	    HashMap<String, TreeMap<Integer, String>> episodesInOrder = new HashMap<>();
 
@@ -377,22 +377,49 @@ public class HTTP {
 	                String episodeName = s.split("episodeName\":\"")[1].split("\",\"firstAired")[0];
 
 	                int episodeNumber = -1;
-	                if(dvdEpisodeNumberStr.equals("null")) {
-	                	episodeNumber = Integer.parseInt(airedEpisodeNumberStr);
+
+	                if(useDVDOrder) {
+	                	if(!dvdEpisodeNumberStr.equals("null")) {
+	                		episodeNumber = Integer.parseInt(dvdEpisodeNumberStr);
+	                		
+	                		//use dvd episode season if it exists
+	                		String episodeSeason = dvdEpisodeSeason;
+	    	                if(episodeSeason.equals("null")) {
+	    	                	//use aired episode season if there is no corresponding dvd episode season
+	    	                	episodeSeason = airedEpisodeSeason;
+	    	                }
+	    	                
+	    	                //add the season to the treemap if it's not in there yet
+	                		if (!episodesInOrder.containsKey(episodeSeason)) {
+	    	                    episodesInOrder.put(episodeSeason, new TreeMap<Integer, String>());
+	    	                }
+	                		
+	                		//add the episode to the season within the hashmap
+	                		episodesInOrder.get(episodeSeason).put(episodeNumber, unescapeUnicode(episodeName));
+	                	}
 	                }
+	                //use aired order
 	                else {
-	                	episodeNumber = Integer.parseInt(dvdEpisodeNumberStr);
+	                	if(!airedEpisodeNumberStr.equals("null")) {
+		                	episodeNumber = Integer.parseInt(airedEpisodeNumberStr);
+		                	
+		                	//use aired episode season if it exists
+	                		String episodeSeason = airedEpisodeSeason;
+	    	                if(episodeSeason.equals("null")) {
+	    	                	//use dvd episode season if there is no corresponding aired episode season
+	    	                	episodeSeason = dvdEpisodeSeason;
+	    	                }
+	    	                
+	    	                //add the season to the treemap if it's not in there yet
+	                		if (!episodesInOrder.containsKey(episodeSeason)) {
+	    	                    episodesInOrder.put(episodeSeason, new TreeMap<Integer, String>());
+	    	                }
+	                		
+	                		//add the episode to the season within the hashmap
+	                		episodesInOrder.get(episodeSeason).put(episodeNumber, unescapeUnicode(episodeName));
+		                }
 	                }
-	                String episodeSeason = dvdEpisodeSeason;
-	                if(episodeSeason.equals("null")) {
-	                	episodeSeason = airedEpisodeSeason;
-	                }
-
-	                if (!episodesInOrder.containsKey(episodeSeason)) {
-	                    episodesInOrder.put(episodeSeason, new TreeMap<Integer, String>());
-	                }
-
-	                episodesInOrder.get(episodeSeason).put(episodeNumber, unescapeUnicode(episodeName));
+	                
 	            }
 
 	        } catch (Exception e) {
@@ -413,7 +440,6 @@ public class HTTP {
 
 	        result.put(season, episodeList);
 	    }
-
 
 	    return result;
 	}
