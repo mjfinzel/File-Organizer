@@ -368,6 +368,7 @@ public class HTTP {
 	            }
 
 	            String[] episodes = fullResponse.split("\\},\\{");
+	            System.out.println("Number of episodes found: "+episodes.length);
 
 	            for (String s : episodes) {
 	                String dvdEpisodeNumberStr = s.split("dvdEpisodeNumber\":")[1].split(",")[0];
@@ -440,7 +441,6 @@ public class HTTP {
 
 	        result.put(season, episodeList);
 	    }
-
 	    return result;
 	}
 

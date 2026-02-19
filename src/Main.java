@@ -398,6 +398,7 @@ public class Main {
 	 * @param path - The file path of the series.
 	 */
 	public static void renameSeries(String path) {
+		System.out.println("renaming series");
 		//get a list of the files in the path
 		File[] listOfFiles = listFiles(path);
 
@@ -468,7 +469,7 @@ public class Main {
 		HashMap<String, ArrayList<String>> episodeNames = null;
 
 		episodeNames = associateVideosWithEpisodes(videoFilesInPath, episodeNameResults, seriesName);
-		if(episodeNames == null) {
+		if(episodeNames == null || episodeNames.size() == 0) {
 			System.out.println("Retrying with aired order...");
 			episodeNameResults = HTTP.getEpisodeNamesForSeries(seriesName, token, false);
 			episodeNames = associateVideosWithEpisodes(videoFilesInPath, episodeNameResults, seriesName);
@@ -583,6 +584,9 @@ public class Main {
 	}
 
 	public static HashMap<String, ArrayList<String>> associateVideosWithEpisodes(TreeMap<String, ArrayList<String>> videoFilesInPath, HashMap<String, ArrayList<String>> apiEpisodeNames, String seriesName) {
+		if(apiEpisodeNames.size() == 0)
+			return null;
+		
 		HashMap<String, ArrayList<String>> foundEpisodeNames = new HashMap<String, ArrayList<String>>();
 		//for each season
 		for(String season: videoFilesInPath.keySet()) {
